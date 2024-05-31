@@ -104,7 +104,7 @@ func handleGetTemperatureByCEP(w http.ResponseWriter, r *http.Request) {
 	_, span := otel.Tracer("service-b").Start(r.Context(), "GetAddressFromViaCEP")
 	
 	address, err := cep.GetAddressFromViaCEP(cepReq)
-	if err != nil {
+	if err != nil || address == nil{
 		http.Error(w, "can not find zipcode", http.StatusNotFound)
 		return
 	}
