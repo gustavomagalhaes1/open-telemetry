@@ -65,6 +65,8 @@ func main() {
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("service-a").Start(r.Context(), "GetCepWheather")
+
 	// Parse the request
 	var requestData Cep
 	err := json.NewDecoder(r.Body).Decode(&requestData)
@@ -72,10 +74,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
 		return
 	}
-
-	// Create a new span to validate the CEP
-	ctx, span := otel.Tracer("service-a").Start(r.Context(), "cep-validation")
-	defer span.End()
 
 	// Check if the zipcode is valid
 	if !isValidCEP(requestData.Cep) {
@@ -97,6 +95,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to copy response body", http.StatusInternalServerError)
 		return
 	}
+	span.End()
 }
 
 func isValidCEP(cep string) bool {

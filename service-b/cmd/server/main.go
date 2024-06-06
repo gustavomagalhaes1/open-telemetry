@@ -98,10 +98,10 @@ func checkCepMiddleware(next http.Handler) http.Handler {
 }
 
 func handleGetTemperatureByCEP(w http.ResponseWriter, r *http.Request) {
-	cepReq := chi.URLParam(r, "cep")
-
 	// Create a new span to validate the CEP
-	_, span := otel.Tracer("service-b").Start(r.Context(), "GetAddressFromViaCEP")
+	_, span := otel.Tracer("service-b").Start(r.Context(), "GetCEP")
+
+	cepReq := chi.URLParam(r, "cep")
 	
 	address, err := cep.GetAddressFromViaCEP(cepReq)
 	if err != nil || address == nil{
@@ -117,7 +117,6 @@ func handleGetTemperatureByCEP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "can not find weather", http.StatusNotFound)
 		return
 	}
-	span2.End()
 
 	temperature := TemperatureResponse{
 		City:  address.Localidade,
@@ -126,4 +125,5 @@ func handleGetTemperatureByCEP(w http.ResponseWriter, r *http.Request) {
 		TempK: weather.CelsiusToKelvin(weatherResponse.Current.TempC),
 	}
 	json.NewEncoder(w).Encode(temperature)
+	span2.End()
 }
