@@ -74,7 +74,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
-
 	// Parse the request
 	var requestData Cep
 	err := json.NewDecoder(r.Body).Decode(&requestData)
