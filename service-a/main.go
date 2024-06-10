@@ -8,9 +8,11 @@ import (
 	"net/http"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/zipkin"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
@@ -65,7 +67,13 @@ func main() {
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	ctx, span := otel.Tracer("service-a").Start(r.Context(), "GetCepWheather")
+	ctx, span := otel.Tracer("service-a").Start(r.Context(), "handleRequest")
+	traceID := span.SpanContext().TraceID().String()
+	span.SetAttributes(attribute.String("trace-id", traceID))
+	defer span.End()
+
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
 
 	// Parse the request
 	var requestData Cep
@@ -95,7 +103,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to copy response body", http.StatusInternalServerError)
 		return
 	}
-	span.End()
+
 }
 
 func isValidCEP(cep string) bool {
@@ -117,15 +125,15 @@ func isValidCEP(cep string) bool {
 }
 
 func sendToServiceB(ctx context.Context, cep string) (*http.Response, error) {
-	// Create a new span to send the request to service b
-	ctx, span := otel.Tracer("service-a").Start(ctx, "sendToServiceB")
-	defer span.End()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://goapp-service-b:8081/"+cep, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	
+	propagator := propagation.TraceContext{}
+	propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	return http.DefaultClient.Do(req)
 }

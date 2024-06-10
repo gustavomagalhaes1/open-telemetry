@@ -1,15 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
-	"context"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/zipkin"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
@@ -53,6 +54,7 @@ func initTrace() {
 		)),
 	)
 	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 }
 
 func main() {
@@ -98,11 +100,14 @@ func checkCepMiddleware(next http.Handler) http.Handler {
 }
 
 func handleGetTemperatureByCEP(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	propagator := propagation.TraceContext{}
+	ctx1 := propagator.Extract(ctx, propagation.HeaderCarrier(r.Header))
+
 	// Create a new span to validate the CEP
-	_, span := otel.Tracer("service-b").Start(r.Context(), "GetCEP")
+	ctx1, span := otel.Tracer("service-b").Start(ctx1, "GetCEP")
 
 	cepReq := chi.URLParam(r, "cep")
-	
 	address, err := cep.GetAddressFromViaCEP(cepReq)
 	if err != nil || address == nil{
 		http.Error(w, "can not find zipcode", http.StatusNotFound)
@@ -110,7 +115,7 @@ func handleGetTemperatureByCEP(w http.ResponseWriter, r *http.Request) {
 	}
 	span.End()
 
-	_, span2 := otel.Tracer("service-b").Start(r.Context(), "GetWeather")
+	_, span2 := otel.Tracer("service-b").Start(ctx1, "GetWeather")
 	weatherResponse, err := weather.GetWeather(address.Localidade)
 	log.Println(weatherResponse.Current.TempC)
 	if err != nil {
